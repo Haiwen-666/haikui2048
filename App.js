@@ -1,10 +1,11 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { View, Text, PanResponder, Dimensions, StatusBar, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, PanResponder, Dimensions, StatusBar, Platform, TouchableOpacity, Animated } from 'react-native';
 import { GameEngine } from './src/engine/GameEngine';
 import Board from './src/components/Board';
 import ScoreBoard from './src/components/ScoreBoard';
 import GameOverModal from './src/components/GameOverModal';
 import SharePoster from './src/components/SharePoster';
+import { Share } from 'react-native';
 import { skins, skinKeys } from './src/theme/colors';
 import { playMove, playMerge, playWin, playLose, playUndo } from './src/audio/sounds';
 
@@ -109,6 +110,48 @@ function DirectionButtons({ engineRef, updateState, theme }) {
   );
 }
 
+// 原生平台樱花飘落
+function NativeSakura({ on }) {
+  const anims = useRef(Array.from({length:8}, () => ({
+    left: Math.random()*100,
+    y: new Animated.Value(-30),
+    size: 12+Math.random()*10,
+    speed: 3000+Math.random()*4000,
+    delay: Math.random()*3000,
+  }))).current;
+
+  useEffect(() => {
+    if (!on) return () => {};
+    const loops = [];
+    anims.forEach((a) => {
+      const t = setTimeout(() => {
+        const loop = Animated.loop(
+          Animated.sequence([
+            Animated.timing(a.y, { toValue: 800, duration: a.speed, useNativeDriver: true }),
+            Animated.delay(500),
+            Animated.timing(a.y, { toValue: -30, duration: 0, useNativeDriver: true }),
+          ])
+        );
+        loop.start();
+        loops.push(loop);
+      }, a.delay);
+    });
+    return () => { anims.forEach(a => a.y.setValue(-30)); };
+  }, [on]);
+
+  if (!on) return null;
+  return (
+    <View style={{ position:'absolute', top:0, left:0, right:0, bottom:0, pointerEvents:'none' }}>
+      {anims.map((a, i) => (
+        <Animated.Text key={i} style={{
+          position:'absolute', left:`${a.left}%`, fontSize:a.size, opacity:0.35,
+          transform:[{translateY:a.y}],
+        }}>{['🌸','💮','✿'][i%3]}</Animated.Text>
+      ))}
+    </View>
+  );
+}
+
 // 高分配存储 — 每个棋盘尺寸独立
 const HS = {};
 [3,4,5,6].forEach(sz => {
@@ -168,6 +211,11 @@ export default function App() {
   const undo = useCallback(() => { if(engineRef.current.undo()){playUndo();updateState();} }, [updateState]);
   const reset = useCallback(() => { engineRef.current.reset(boardSize); setNewHigh(false); setModal(false); updateState(); }, [updateState, boardSize]);
   const cont = useCallback(() => { engineRef.current.continueAfterWin(); setModal(false); updateState(); }, [updateState]);
+  const handleShare = useCallback(() => {
+    if (Platform.OS==='web') { setShowPoster(true); return; }
+    const deco = {space:'🪐',sakura:'🌸',mint:'🍀',ocean:'🌊'};
+    Share.share({ message: `${deco[skinKey]||''} 海葵版2048\n得分: ${score}  🏆最高: ${highScore}\n👣 ${steps}步 | ${boardSize}x${boardSize}\n来挑战我吧!` });
+  }, [skinKey, score, highScore, steps, boardSize]);
   const changeSize = useCallback((sz) => { setBoardSize(sz); engineRef.current.reset(sz); setNewHigh(false); setHighScore(loadHS(sz)); setModal(false); updateState(); }, [updateState]);
 
   // 键盘
@@ -178,14 +226,16 @@ export default function App() {
     return ()=>document.removeEventListener('keydown',h);
   }, [move]);
 
-  // 樱花花瓣
+  // 樱花花瓣（双平台）
   useEffect(() => {
-    if (skinKey==='sakura' && petalsOn && Platform.OS==='web') {
-      injectSakuraCSS();
-      spawnPetals(8);
-      const t = setInterval(() => spawnPetals(4), 10000);
-      return () => { clearInterval(t); clearAllPetals(); };
-    } else {
+    if (skinKey==='sakura' && petalsOn) {
+      if (Platform.OS==='web') {
+        injectSakuraCSS();
+        spawnPetals(8);
+        const t = setInterval(() => spawnPetals(4), 10000);
+        return () => { clearInterval(t); clearAllPetals(); };
+      }
+    } else if (Platform.OS==='web') {
       clearAllPetals();
     }
   }, [skinKey, petalsOn]);
@@ -201,6 +251,7 @@ export default function App() {
   return (
     <View style={{ flex:1, backgroundColor:bg, justifyContent:'flex-start', alignItems:'center', paddingHorizontal:BOARD_PAD, paddingTop:30 }}>
       <StatusBar barStyle={darkMode?'light-content':'dark-content'} />
+      {Platform.OS!=='web' && <NativeSakura on={skinKey==='sakura' && petalsOn} />}
 
       {/* === 顶部 Logo 区（不移动）=== */}
       <View style={{ width:boardDim }}>
@@ -263,13 +314,11 @@ export default function App() {
         {Platform.OS==='web' && <DirectionButtons engineRef={engineRef} updateState={updateState} theme={theme} />}
 
         {/* 分享按钮 */}
-        {Platform.OS==='web' && (
-          <TouchableOpacity onPress={()=>setShowPoster(true)}
-            style={{ marginTop:16, alignSelf:'center', backgroundColor:theme.cellBg, borderRadius:10, paddingHorizontal:16, paddingVertical:8, borderWidth:1, borderColor:theme.glassBorder }}
-            activeOpacity={0.7}>
-            <Text style={{ fontSize:13, color:theme.text }}>📤 分享成绩</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity onPress={handleShare}
+          style={{ marginTop:16, alignSelf:'center', backgroundColor:theme.cellBg, borderRadius:10, paddingHorizontal:16, paddingVertical:8, borderWidth:1, borderColor:theme.glassBorder }}
+          activeOpacity={0.7}>
+          <Text style={{ fontSize:13, color:theme.text }}>📤 分享成绩</Text>
+        </TouchableOpacity>
       </View>
 
       <GameOverModal visible={modal} won={won} score={score} onRestart={reset}
