@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { View, Text, PanResponder, Dimensions, StatusBar, Platform, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, PanResponder, Dimensions, StatusBar, Platform, TouchableOpacity } from 'react-native';
 import { GameEngine } from './src/engine/GameEngine';
 import Board from './src/components/Board';
 import ScoreBoard from './src/components/ScoreBoard';

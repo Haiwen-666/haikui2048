@@ -1,30 +1,38 @@
-// 2048 音效 — 防崩溃版，Web+Native 双平台
-let audioCtx = null;
+// 2048 音效 — Web Audio API 专用
+// 原生端无音效，不崩就行
 
-function webCtx() {
-  if (!audioCtx) audioCtx = new (typeof AudioContext!=='undefined'?AudioContext:window.webkitAudioContext)();
+let audioCtx = null;
+const isWeb = typeof document !== 'undefined';
+
+function ctx() {
+  if (!isWeb) return null;
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e) { return null; }
+  }
   return audioCtx;
 }
-function webPop(vol=0.06) {
-  try { const c=webCtx(); const o=c.createOscillator(); const g=c.createGain(); o.type='sine'; o.frequency.setValueAtTime(800,c.currentTime); o.frequency.exponentialRampToValueAtTime(400,c.currentTime+0.08); g.gain.setValueAtTime(vol,c.currentTime); g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+0.10); o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+0.12); } catch(e){}
-}
 
-async function nativePop() {
+function pop(vol = 0.06) {
+  if (!isWeb) return;
+  const c = ctx();
+  if (!c) return;
   try {
-    const { Audio } = require('expo-av');
-    await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-    const { sound } = await Audio.Sound.createAsync({ uri:'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=' }, { shouldPlay:false, volume:0.3 });
-    await sound.setPositionAsync(0);
-    await sound.playAsync();
-    setTimeout(() => { try { sound.unloadAsync(); } catch(e){} }, 500);
-  } catch(e) {}
+    const o = c.createOscillator();
+    const g = c.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(800, c.currentTime);
+    o.frequency.exponentialRampToValueAtTime(400, c.currentTime + 0.08);
+    g.gain.setValueAtTime(vol, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.10);
+    o.connect(g);
+    g.connect(c.destination);
+    o.start();
+    o.stop(c.currentTime + 0.12);
+  } catch (e) {}
 }
 
-const isWeb = typeof document !== 'undefined';
-let nativeReady = false;
-
-export function playMove() { isWeb ? webPop(0.04) : nativePop(); }
-export function playMerge() { isWeb ? webPop(0.07) : nativePop(); }
-export function playWin() { isWeb ? (webPop(0.1), setTimeout(()=>webPop(0.1),120)) : nativePop(); }
-export function playLose() { isWeb ? webPop(0.03) : nativePop(); }
-export function playUndo() { isWeb ? webPop(0.03) : nativePop(); }
+export function playMove() { pop(0.04); }
+export function playMerge() { pop(0.07); }
+export function playWin() { pop(0.1); setTimeout(() => pop(0.1), 120); }
+export function playLose() { pop(0.03); }
+export function playUndo() { pop(0.03); }
