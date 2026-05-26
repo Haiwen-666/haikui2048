@@ -110,43 +110,22 @@ function DirectionButtons({ engineRef, updateState, theme }) {
   );
 }
 
-// 原生平台樱花飘落
+// 原生平台樱花飘落（与web同逻辑）
 function NativeSakura({ on }) {
-  const anims = useRef(Array.from({length:8}, () => ({
-    left: Math.random()*100,
-    y: new Animated.Value(-30),
-    size: 12+Math.random()*10,
-    speed: 3000+Math.random()*4000,
-    delay: Math.random()*3000,
-  }))).current;
-
+  const [tick, setTick] = useState(0);
   useEffect(() => {
-    if (!on) return () => {};
-    const loops = [];
-    anims.forEach((a) => {
-      const t = setTimeout(() => {
-        const loop = Animated.loop(
-          Animated.sequence([
-            Animated.timing(a.y, { toValue: 800, duration: a.speed, useNativeDriver: true }),
-            Animated.delay(500),
-            Animated.timing(a.y, { toValue: -30, duration: 0, useNativeDriver: true }),
-          ])
-        );
-        loop.start();
-        loops.push(loop);
-      }, a.delay);
-    });
-    return () => { anims.forEach(a => a.y.setValue(-30)); };
+    if (!on) { setTick(0); return; }
+    const id = setInterval(() => setTick(t => t+1), 5000);
+    return () => clearInterval(id);
   }, [on]);
-
   if (!on) return null;
   return (
-    <View style={{ position:'absolute', top:0, left:0, right:0, bottom:0, pointerEvents:'none' }}>
-      {anims.map((a, i) => (
-        <Animated.Text key={i} style={{
-          position:'absolute', left:`${a.left}%`, fontSize:a.size, opacity:0.35,
-          transform:[{translateY:a.y}],
-        }}>{['🌸','💮','✿'][i%3]}</Animated.Text>
+    <View style={{ position:'absolute', top:0, left:0, right:0, bottom:0, pointerEvents:'none' }} pointerEvents="none">
+      {Array.from({length:8}).map((_,i) => (
+        <Text key={i} style={{
+          position:'absolute', left:`${5+i*12}%`, top:`${(tick*7+i*11)%100}%`,
+          fontSize:12, opacity:0.3,
+        }}>{['🌸','💮','✿'][i%3]}</Text>
       ))}
     </View>
   );
